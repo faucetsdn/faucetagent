@@ -13,6 +13,8 @@ before_install:
 install:
 - ./dependencies.sh
 - ./test-dependencies.sh
+- echo "Testing against latest FAUCET"
+- sudo pip3 -q install git+https://github.com/faucetsdn/faucet
 
 script:
 - make

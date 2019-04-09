@@ -44,4 +44,4 @@ clean:
 
 test: all
 	GOPATH=$(GOPATH) PATH=$(GOPATH)/bin:$(PATH) ./agenttest.py
-	grep faucet_config_applied faucetagent.log || true
+	grep faucet_config faucetagent.log || true
