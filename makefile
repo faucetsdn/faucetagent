@@ -43,5 +43,6 @@ clean:
 	rm -rf *proto *pb2*py *pyc *~ \#*\# testcerts *log __pycache__ *yaml
 
 test: all
+	pip3 install git+https://github.com/mininet/mininet.git
 	GOPATH=$(GOPATH) PATH=$(GOPATH)/bin:$(PATH) ./agenttest.py
 	grep faucet_config_applied faucetagent.log || true
