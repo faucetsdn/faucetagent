@@ -33,6 +33,7 @@ FAUCET configuration file (e.g. `faucet.yaml`) via gNMI path `/`.
 ### Simple end-to-end test using Mininet
 
     ./dependencies.sh
+    ./test-dependencies.sh
     make
     sudo make test
 
@@ -40,4 +41,3 @@ FAUCET configuration file (e.g. `faucet.yaml`) via gNMI path `/`.
 [2]: https://travis-ci.org/lantz/faucetagent
 [3]: https://github.com/faucetsdn/faucet
 [4]: https://github.com/google/gnxi
-
