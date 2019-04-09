@@ -12,16 +12,11 @@ before_install:
 
 install:
 - ./dependencies.sh
-- sudo -H pip3 install flake8 pylint
-- git clone https://github.com/mininet/mininet
-- PYTHON=python3 mininet/util/install.sh -nv
+- ./test-dependencies.sh
 
 script:
 - make
-- sudo -E make codecheck  # terrible but mininet == sudo
-# temporary: install patched faucet
-- git clone https://github.com/lantz/faucet -b config_applied
-- (cd faucet; sudo -H python3 setup.py install)
+- make codecheck
 - sudo -E make test
 
 notifications:
