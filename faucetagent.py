@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """
 
 faucetagent.py: FAUCET configuration agent
@@ -15,6 +15,8 @@ from argparse import ArgumentParser
 from subprocess import run
 from logging import basicConfig as logConfig, getLogger, DEBUG, INFO
 from collections import namedtuple
+from os.path import abspath
+import hashlib
 
 import requests
 import grpc
@@ -58,7 +60,7 @@ class FaucetProxy:
                  timeout=120,
                  dp_wait_fraction=0.0):
         """Initialize with path and local FAUCET prometheus port"""
-        self.path = path
+        self.path = abspath(path)
         self.prometheus_port = prometheus_port
         self.prometheus_url = 'http://localhost:%d' % self.prometheus_port
         self.timeout = timeout
@@ -72,9 +74,36 @@ class FaucetProxy:
         return data, now
 
     # FAUCET status fields we care about
-    StatusTuple = namedtuple(
-        'StatusTuple', ('faucet_config_reload_requests_total',
-                        'faucet_config_load_error', 'faucet_config_applied'))
+    statusFields = ('faucet_config_reload_requests_total',
+                    'faucet_config_load_error', 'faucet_config_applied',
+                    'faucet_config_hash_info', 'faucet_config_hash_func')
+    StatusTuple = namedtuple('StatusTuple', statusFields)
+
+    @staticmethod
+    def parse_line(line):
+        "Parse a line of prometheus output"
+        if ' ' in line and not line.startswith('#'):
+            field, value = line.split(' ')[0:2]
+        else:
+            return None, None
+        pos = field.find('{')
+        if pos < 0:
+            # Return float
+            return field, float(value)
+        # Return dict
+        value = {}
+        name, labels = field[:pos], field[pos:]
+        if not (labels.startswith('{') and labels.endswith('}')):
+            return name, value
+        labels = labels[1:-1]
+        entries = labels.split(',')
+        for entry in entries:
+            fields = entry.split('=')
+            fields = [field.strip(' "' '') for field in fields]
+            if len(fields) == 2:
+                key, val = fields
+                value[key] = val
+        return name, value
 
     def fetch_status(self):
         """Fetch and return FAUCET status via prometheus port"""
@@ -91,53 +120,77 @@ class FaucetProxy:
         assert 'faucet_config_reload_requests_total' in request.text
         sdict = {}
         for line in request.text.split('\n'):
-            if ' ' in line and not line.startswith('#'):
-                field, value = line.split(' ')[0:2]
-                if field in self.StatusTuple._fields:
-                    sdict[field] = float(value)
+            name, value = self.parse_line(line)
+            if name in self.statusFields:
+                sdict[name] = value
 
-        # Handle older FAUCET without applied signal
-        applied = 'faucet_config_applied'
-        if applied not in sdict:
-            warning('this FAUCET does not support %s - faking', applied)
-            sdict[applied] = 1
+        # Handle missing values
+        defaults = {
+            'faucet_config_applied': 1.0,
+            'faucet_config_hash_info': {},
+        }
+        for field, value in defaults.items():
+            if field not in sdict:
+                warning('this FAUCET does not support %s - faking', field)
+                sdict[field] = value
 
         status = self.StatusTuple(**sdict)
+        debug('fetch_status: %s', status)
         return status
 
-    def reload(self):
-        """Tell FAUCET to reload its config"""
+    def _check_hash(self, status, config):
+        """Return True if FAUCET's config hash == our config hash"""
+        # Get FAUCET's config file name and hash value
+        file_hashes = status.faucet_config_hash_info
+        if len(file_hashes) != 1:
+            return False
+        name, hash_value = list(file_hashes.items())[0]
+        if abspath(name) != self.path:
+            return False
+        # Get hash function
+        algs = list(status.faucet_config_hash_func.values())
+        if len(algs) != 1:
+            return False
+        hash_func = getattr(hashlib, algs[0], None)
+        if not hash_func:
+            return False
+        # Verify config file hash matches value from FAUCET
+        if hash_value == hash_func(config.encode('utf-8')).hexdigest():
+            debug('_check_hash: hashes match')
+            return True
+        return False
+
+    def _check_status(self, status, config):
+        """Return True if config has been successfully (re)loaded"""
+        return (status and self._check_hash(status, config)
+                and not status.faucet_config_load_error
+                and self._check_applied(status))
+
+    def _check_applied(self, status):
+        """Return True if fraction of applied datapaths exceeds threshold"""
+        # Optionally wait for "applied" (aka enqueued) fraction
+        debug('%.0f%% >= %.0f%% of datapaths configured',
+              status.faucet_config_applied * 100.0,
+              self.dp_wait_fraction * 100.0)
+        return status.faucet_config_applied >= self.dp_wait_fraction
+
+    def reload(self, config):
+        """Signal FAUCET and wait for it to load our config"""
         debug('Reloading FAUCET config')
-        status = self.fetch_status()
-        if not status:
-            raise RuntimeError('FAUCET prometheus request failed')
-        reloads = status.faucet_config_reload_requests_total
-        debug('faucet_config_reload_requests = %d', reloads)
+
         # Send HUP to tell FAUCET to reload the config file
         debug('Sending HUP (config reload signal) to FAUCET')
         cmd = 'fuser -k -HUP %d/tcp' % self.prometheus_port
-        output = run(cmd.split(), check=True)
-        debug(output)
-        # Wait for the reload count to increment
-        debug('Waiting for reload requests to increment')
+        run(cmd.split(), check=True)
+
+        # Wait for FAUCET to reload config
+        debug('Waiting for FAUCET config (re)load')
         start = time()
         while time() - start < self.timeout:
             status = self.fetch_status()
-            debug('FAUCET status: %s', status)
-            new_reloads = status.faucet_config_reload_requests_total
-            debug('faucet_config_reload_requests_total = %d', new_reloads)
-            debug('faucet_config_applied = %.2f', status.faucet_config_applied)
-            if new_reloads > reloads:
-                if status.faucet_config_load_error:
-                    raise RuntimeError('FAUCET config load error')
-                if status.faucet_config_applied >= self.dp_wait_fraction:
-                    # Success (note "applied" == "enqueued")
-                    debug('%.0f%% >= %.0f%% of datapaths configured',
-                          status.faucet_config_applied * 100.0,
-                          self.dp_wait_fraction * 100.0)
-                    return
-            elif new_reloads < reloads:
-                raise RuntimeError('FAUCET restarted during reload')
+            if self._check_status(status, config):
+                # Success!
+                return
             # Wait a bit before trying again
             sleep(1)
         raise RuntimeError('Timeout during FAUCET config reload')
@@ -155,7 +208,7 @@ class FaucetProxy:
             raise IOError(
                 'Configuration file %s not written properly.' % self.path)
         # Tell FAUCET to reload its configuration
-        self.reload()
+        self.reload(config=data)
 
 
 # Interface to gNMI
