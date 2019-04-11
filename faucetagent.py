@@ -334,6 +334,7 @@ def parse():
         type=float,
         default=0.0,
         help='Wait for FAUCET to attempt to update this fraction of DPs')
+    arg('--timeout', default=120, help='max time(s) to wait for config reload')
     arg('-v', '--version', action='version', version=VERSION)
     return parser.parse_args()
 
@@ -342,7 +343,8 @@ def main():
     """Parse arguments and run FAUCET gNMI agent"""
     args = parse()
     # FaucetProxy talks to FAUCET and manages configfile
-    proxy = FaucetProxy(path=args.configfile, dp_wait_fraction=args.dpwait)
+    proxy = FaucetProxy(path=args.configfile, dp_wait_fraction=args.dpwait,
+                        timeout=args.timeout)
     # FaucetAgent handles gNMI requests
     agent = FaucetAgent(proxy)
     # Start the FAUCET gNMI service
