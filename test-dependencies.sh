@@ -4,8 +4,8 @@ set -e
 PIP3='sudo pip3 -q install --no-cache'
 APT='sudo apt -qq -y install'
 
-echo "* Installing go dependencies"
-  $APT golang
+echo "* Installing apt dependencies"
+  $APT golang iputils-arping
 
 echo "* Checking for go version 1.7 or later"
   goversion=$(go version | awk '{print $3;}')

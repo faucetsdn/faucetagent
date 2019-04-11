@@ -45,4 +45,3 @@ clean:
 test: all
 	@echo "* Using GOPATH=$(GOPATH)"
 	GOPATH=$(GOPATH) PATH=$(GOPATH)/bin:$(PATH) ./agenttest.py
-	grep faucet_config faucetagent.log || true

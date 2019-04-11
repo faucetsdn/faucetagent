@@ -40,7 +40,7 @@ from mininet.net import Mininet
 from mininet.node import Controller
 from mininet.topo import Topo
 from mininet.util import irange
-from mininet.log import setLogLevel, info, error
+from mininet.log import setLogLevel, info, warn, error
 from mininet.util import decode
 
 # pylint: disable=too-few-public-methods
@@ -136,7 +136,7 @@ def check(hosts, groups):
     vlan = {host: group for group in groups for host in group}
 
     # Start pings
-    pings = [(src, dst, src.popen('ping -c1 -w1 %s' % dst.IP()))
+    pings = [(src, dst, src.popen('ping -c1 %s' % dst.IP()))
              for src in hosts for dst in hosts]
 
     errors = 0
@@ -297,6 +297,36 @@ def string_val(output):
     return line
 
 
+def wait_for_flows(switches, flows, timeout=10):
+    """Wait for text to appear in ovs-ofctl dump-flows for switches"""
+    start = time()
+    while time() - start < timeout:
+        dumps = {
+            switch: switch.cmd('ovs-ofctl dump-flows', switch)
+            for switch in switches
+        }
+        waiting = {
+            switch.name: flow
+            for switch, dump in dumps.items() for flow in flows
+            if flow not in dump
+        }
+        if not waiting:
+            return dumps
+        sleep(1)
+    for switch, flow in waiting.items():
+        warn('warning: flow (%s) not found on %s after %ss\n' % (flow, switch,
+                                                                 timeout))
+    return dumps
+
+
+def send_arps(hosts):
+    """Send gratuitous ARP updates from all hosts"""
+    for host in hosts:
+        host.sendCmd('arping -c 1 -U -i', host.defaultIntf(), host.IP())
+    for host in hosts:
+        host.waitOutput()
+
+
 #
 # End-to-end agent test
 #
@@ -318,7 +348,7 @@ def end_to_end_test():
                    ' -target_name localhost').format(**params).split()
 
     info('* Starting network\n')
-    net = Mininet(topo=TestTopo(), controller=FAUCET)
+    net = Mininet(topo=TestTopo(), controller=FAUCET, autoSetMacs=True)
     net.start()
 
     info('* Shutting down any agents listening on %d\n' % GNMI_PORT)
@@ -359,15 +389,14 @@ def end_to_end_test():
         if sent != received:
             error('ERROR: received config differs from sent config\n')
 
-        # FAUCET currently sets 'applied' after it has configured all
-        # switches, but doesn't currently wait for a barrier reply
-        # (and it doesn't use barriers with OVS anyway.)
-        # For now we are stuck waiting a bit for the messages to
-        # take effect.
-        # pylint: disable=fixme
-        # TODO: check OVS flow table state
-        info('* Waiting two seconds for switch eventual consistency\n')
-        sleep(2)
+        info('* Sending gratuitous ARPs\n')
+        send_arps(net.hosts)
+
+        # Assume state is good after all switches have some new flows
+        flows = ['dl_vlan=%d' % test_case['vid1']]
+        flows += ['dl_dst=%s' % host.MAC() for host in net.hosts]
+        info('* Waiting for new flows on switches\n')
+        wait_for_flows(net.switches, flows)
 
         groups = test_case['groups']
         info('* Verifying connectivity for', groups, '\n')
@@ -375,6 +404,7 @@ def end_to_end_test():
         errors = check(hosts=net.hosts, groups=host_groups)
         info('Test Case #%d:' % test_num, 'OK'
              if errors == 0 else 'FAIL (%d errors)' % errors, '\n')
+
         if errors:
             fail_count += 1
 
