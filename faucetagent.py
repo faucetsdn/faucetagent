@@ -9,13 +9,13 @@ FAUCET.
 
 """
 
-from time import sleep, time
-from concurrent import futures
 from argparse import ArgumentParser
-from subprocess import run
-from logging import basicConfig as logConfig, getLogger, DEBUG, INFO
 from collections import namedtuple
+from concurrent import futures
+from logging import basicConfig as logConfig, getLogger, DEBUG, INFO
 from os.path import abspath
+from subprocess import run
+from time import sleep, time
 import hashlib
 
 import requests
@@ -131,7 +131,7 @@ class FaucetProxy:
         }
         for field, value in defaults.items():
             if field not in sdict:
-                warning('this FAUCET does not support %s - faking', field)
+                debug('%s not found (possibly unsupported?)', field)
                 sdict[field] = value
 
         status = self.StatusTuple(**sdict)
