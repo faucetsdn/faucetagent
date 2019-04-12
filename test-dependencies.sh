@@ -34,7 +34,7 @@ echo "* Installing python dependencies"
 echo "* Installing latest faucet"
   $PIP3 --upgrade git+https://github.com/faucetsdn/faucet
 
-echo "* Installing openvswitch-switch, gcc and latest mininet"
+echo "* Installing openvswitch-switch and latest mininet"
   $APT openvswitch-switch
   sudo service openvswitch-switch start
   TMPDIR=$(mktemp -d) && pushd $TMPDIR
