@@ -25,23 +25,22 @@ $(gnmiproto):
 $(extproto):
 	wget $(urlbase)/gnmi_ext/$@
 
-$(gnmistubs): gnmi.proto gnmi_ext.proto
+$(gnmistubs): $(gnmiproto) $(extproto)
 	$(protoc) $<
 
-$(extstubs): gnmi_ext.proto
+$(extstubs): $(extproto)
 	$(protoc) $<
 
+test: all
+	@echo "* Using GOPATH=$(GOPATH)"
+	GOPATH=$(GOPATH) PATH=$(GOPATH)/bin:$(PATH) ./agenttest.py -v
 
-codecheck: $(gnmistubs) $(extstubs)
+codecheck: all
 	flake8 faucetagent.py agenttest.py
 	pylint faucetagent.py agenttest.py
 
 yapf:
-	yapf3 -i *py
+	yapf3 -i *.py
 
 clean:
-	rm -rf *proto *pb2*py *pyc *~ \#*\# testcerts *log __pycache__ *yaml
-
-test: all
-	@echo "* Using GOPATH=$(GOPATH)"
-	GOPATH=$(GOPATH) PATH=$(GOPATH)/bin:$(PATH) ./agenttest.py
+	rm -rf *.proto *_pb2*.py *.pyc *~ \#*\# testcerts *.log __pycache__ *.yaml

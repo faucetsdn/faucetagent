@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -e
 
 PIP3='pip3 -q'

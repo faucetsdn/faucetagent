@@ -33,8 +33,10 @@ or losing connectivity between the agent and FAUCET.
 
 """
 
+from shutil import which
 from subprocess import run, Popen, PIPE
 from time import sleep, time
+from unittest import TestCase, main
 
 from mininet.net import Mininet
 from mininet.node import Controller
@@ -67,9 +69,6 @@ class TestTopo(Topo):
 
 
 # FAUCET configuration template
-#
-# Maybe we should generate the config automatically
-# rather than just substituting into a template
 
 CONFIG = """
 vlans:
@@ -136,7 +135,7 @@ def check(hosts, groups):
     vlan = {host: group for group in groups for host in group}
 
     # Start pings
-    pings = [(src, dst, src.popen('ping -c1 %s' % dst.IP()))
+    pings = [(src, dst, src.popen('ping -w1 -c1 %s' % dst.IP()))
              for src in hosts for dst in hosts]
 
     errors = 0
@@ -169,9 +168,7 @@ def check(hosts, groups):
     return errors
 
 
-#
 # FAUCET Controller class
-#
 
 
 class FAUCET(Controller):
@@ -331,7 +328,7 @@ def send_arps(hosts):
 # End-to-end agent test
 #
 
-# pylint: disable=too-many-locals
+# pylint: disable=too-many-locals, too-many-statements
 
 
 def end_to_end_test():
@@ -340,7 +337,7 @@ def end_to_end_test():
     # Start with empty FAUCET config file
     write_file(FAUCET.cfile, '')
 
-    info('* Generating certificates\n')
+    info('\n* Generating certificates\n')
     make_certs()
     params = dict(cert_dir=CERT_DIR, gnmi_port=GNMI_PORT, cfile=FAUCET.cfile)
     client_auth = (' -ca {cert_dir}/fakeca.crt -cert {cert_dir}/fakeclient.crt'
@@ -366,6 +363,15 @@ def end_to_end_test():
     info('* Waiting for agent to start up\n')
     wait_server(port=GNMI_PORT)
 
+    info('* Checking gNMI capabilities\n')
+    result = run(['gnmi_capabilities'] + client_auth, stdout=PIPE, check=True)
+    items = [
+        'capabilitiesResponse:', 'name: "FAUCET"', 'organization: "faucet.nz"'
+    ]
+    capabilities = result.stdout.decode()
+    for item in items:
+        assert item in capabilities, ("missing capability field <%s>" % item)
+
     fail_count = 0
 
     for test_num, test_case in enumerate(TEST_CASES):
@@ -374,7 +380,6 @@ def end_to_end_test():
         config = CONFIG.format(**test_case)
 
         info('* Sending test configuration to agent\n')
-        # Pylint doesn't understand [x, *y, z] apparently
         cmd = ['gnmi_set'] + client_auth + ['-replace=/:' + config]
         result = run(cmd, stdout=PIPE, check=True)
         sent = string_val(result.stdout.decode())
@@ -389,14 +394,14 @@ def end_to_end_test():
         if sent != received:
             error('ERROR: received config differs from sent config\n')
 
+        # Assume state is good after all switches have some new flows
+        info('* Waiting for VLAN flows\n')
+        wait_for_flows(net.switches, ['dl_vlan=%d' % test_case['vid1']])
         info('* Sending gratuitous ARPs\n')
         send_arps(net.hosts)
-
-        # Assume state is good after all switches have some new flows
-        flows = ['dl_vlan=%d' % test_case['vid1']]
-        flows += ['dl_dst=%s' % host.MAC() for host in net.hosts]
-        info('* Waiting for new flows on switches\n')
-        wait_for_flows(net.switches, flows)
+        info('* Waiting for MAC learning\n')
+        wait_for_flows(net.switches,
+                       ['dl_dst=%s' % host.MAC() for host in net.hosts])
 
         groups = test_case['groups']
         info('* Verifying connectivity for', groups, '\n')
@@ -415,15 +420,27 @@ def end_to_end_test():
 
     info('* Stopping network\n')
     net.stop()
+
     return fail_count
 
 
-def main():
-    "Entry point as per google pyguide"
-    setLogLevel('info')
-    exit_code = end_to_end_test()
-    exit(exit_code)
+class EndToEndTest(TestCase):
+    """unittest wrapper for end_to_end_test()"""
+
+    deps = ('gnmi_capabilities', 'gnmi_set', 'gnmi_get', 'arping', 'ping')
+
+    @classmethod
+    def setUpClass(cls):
+        """Make sure that necessary executables are present"""
+        for dep in cls.deps:
+            assert which(dep), ("cannot find '%s' in $PATH" % dep)
+
+    def test_end_to_end(self):
+        """Run end to end ping test"""
+        failures = end_to_end_test()
+        self.assertEqual(failures, 0, "End-to-end test failed")
 
 
 if __name__ == '__main__':
+    setLogLevel('info')
     main()
