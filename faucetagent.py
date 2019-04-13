@@ -74,15 +74,16 @@ class FaucetProxy:
         return data, now
 
     # FAUCET status fields we care about
-    statusFields = ('faucet_config_reload_requests_total',
-                    'faucet_config_load_error', 'faucet_config_applied',
-                    'faucet_config_hash_info', 'faucet_config_hash_func')
+    statusFields = ('faucet_config_hash_info', 'faucet_config_hash_func',
+                    'faucet_config_load_error', 'faucet_config_applied')
+
     StatusTuple = namedtuple('StatusTuple', statusFields)
 
     @staticmethod
     def parse_line(line):
         "Parse a line of prometheus output"
-        if ' ' in line and not line.startswith('#'):
+        if ('faucet_config_' in line and ' ' in line
+                and not line.startswith('#')):
             field, value = line.split(' ')[0:2]
         else:
             return None, None
@@ -121,7 +122,7 @@ class FaucetProxy:
         sdict = {}
         for line in request.text.split('\n'):
             name, value = self.parse_line(line)
-            if name in self.statusFields:
+            if name and name in self.statusFields:
                 sdict[name] = value
 
         # Handle missing values
@@ -343,8 +344,10 @@ def main():
     """Parse arguments and run FAUCET gNMI agent"""
     args = parse()
     # FaucetProxy talks to FAUCET and manages configfile
-    proxy = FaucetProxy(path=args.configfile, dp_wait_fraction=args.dpwait,
-                        timeout=args.timeout)
+    proxy = FaucetProxy(
+        path=args.configfile,
+        dp_wait_fraction=args.dpwait,
+        timeout=args.timeout)
     # FaucetAgent handles gNMI requests
     agent = FaucetAgent(proxy)
     # Start the FAUCET gNMI service

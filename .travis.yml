@@ -17,7 +17,8 @@ install:
 script:
 - make
 - make codecheck
-- sudo -E make test
+- ./faucetagent.py --version
+- sudo make test
 
 notifications:
   email:
