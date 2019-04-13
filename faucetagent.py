@@ -118,7 +118,6 @@ class FaucetProxy:
             raise IOError('Error %d fetching FAUCET status from %s' %
                           request.status_code, self.prometheus_url)
 
-        assert 'faucet_config_reload_requests_total' in request.text
         sdict = {}
         for line in request.text.split('\n'):
             name, value = self.parse_line(line)
@@ -161,12 +160,6 @@ class FaucetProxy:
             return True
         return False
 
-    def _check_status(self, status, config):
-        """Return True if config has been successfully (re)loaded"""
-        return (status and self._check_hash(status, config)
-                and not status.faucet_config_load_error
-                and self._check_applied(status))
-
     def _check_applied(self, status):
         """Return True if fraction of applied datapaths exceeds threshold"""
         # Optionally wait for "applied" (aka enqueued) fraction
@@ -174,6 +167,12 @@ class FaucetProxy:
               status.faucet_config_applied * 100.0,
               self.dp_wait_fraction * 100.0)
         return status.faucet_config_applied >= self.dp_wait_fraction
+
+    def _check_status(self, status, config):
+        """Return True if config has been successfully (re)loaded"""
+        return (status and self._check_hash(status, config)
+                and not status.faucet_config_load_error
+                and self._check_applied(status))
 
     def reload(self, config):
         """Signal FAUCET and wait for it to load our config"""
