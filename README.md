@@ -30,7 +30,7 @@ FAUCET configuration file (e.g. `faucet.yaml`) via gNMI path `/`.
     # Send a configuration file to FAUCET
     gnmi_set $AUTH -replace=/:$(<faucet.yaml)
 
-### Simple end-to-end test using Mininet
+### Simple end-to-end test using [mininet][5]
 
     ./dependencies.sh
     ./test-dependencies.sh
@@ -41,3 +41,4 @@ FAUCET configuration file (e.g. `faucet.yaml`) via gNMI path `/`.
 [2]: https://travis-ci.org/lantz/faucetagent
 [3]: https://github.com/faucetsdn/faucet
 [4]: https://github.com/google/gnxi
+[5]: https://github.com/mininet/mininet
