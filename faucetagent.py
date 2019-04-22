@@ -21,6 +21,7 @@ import hashlib
 import requests
 import grpc
 from grpc import ssl_server_credentials
+from prometheus_client.parser import text_string_to_metric_families
 from gnmi_pb2_grpc import gNMIServicer, add_gNMIServicer_to_server
 from gnmi_pb2 import (CapabilityResponse, GetResponse, SetResponse, ModelData,
                       UpdateResult, JSON)
@@ -74,37 +75,24 @@ class FaucetProxy:
         return data, now
 
     # FAUCET status fields we care about
-    statusFields = ('faucet_config_hash_info', 'faucet_config_hash_func',
-                    'faucet_config_load_error', 'faucet_config_applied')
-
+    labelFields = ('faucet_config_hash_info', 'faucet_config_hash_func')
+    valueFields = ('faucet_config_load_error', 'faucet_config_applied')
+    statusFields = labelFields + valueFields
     StatusTuple = namedtuple('StatusTuple', statusFields)
+
+    # Default values to use if a field is missing
+    defaultValues = {
+        'faucet_config_applied': 1.0,
+        'faucet_config_hash_info': {},
+    }
 
     @staticmethod
     def parse_line(line):
-        "Parse a line of prometheus output"
-        if ('faucet_config_' in line and ' ' in line
-                and not line.startswith('#')):
-            field, value = line.split(' ')[0:2]
-        else:
-            return None, None
-        pos = field.find('{')
-        if pos < 0:
-            # Return float
-            return field, float(value)
-        # Return dict
-        value = {}
-        name, labels = field[:pos], field[pos:]
-        if not (labels.startswith('{') and labels.endswith('}')):
-            return name, value
-        labels = labels[1:-1]
-        entries = labels.split(',')
-        for entry in entries:
-            fields = entry.split('=')
-            fields = [field.strip(' "' '') for field in fields]
-            if len(fields) == 2:
-                key, val = fields
-                value[key] = val
-        return name, value
+        "Parse single line of prometheus output"
+        for family in text_string_to_metric_families(line):
+            for sample in family.samples:
+                # Return first (and only) sample
+                return sample
 
     def fetch_status(self):
         """Fetch and return FAUCET status via prometheus port"""
@@ -120,16 +108,17 @@ class FaucetProxy:
 
         sdict = {}
         for line in request.text.split('\n'):
-            name, value = self.parse_line(line)
-            if name and name in self.statusFields:
-                sdict[name] = value
+            if line.startswith('#') or 'faucet_config_' not in line:
+                continue
+            sample = self.parse_line(line)
+            if not sample:
+                continue
+            name, labels, value = sample.name, sample.labels, sample.value
+            if name in self.statusFields:
+                sdict[name] = labels if name in self.labelFields else value
 
         # Handle missing values
-        defaults = {
-            'faucet_config_applied': 1.0,
-            'faucet_config_hash_info': {},
-        }
-        for field, value in defaults.items():
+        for field, value in self.defaultValues.items():
             if field not in sdict:
                 debug('%s not found (possibly unsupported?)', field)
                 sdict[field] = value
@@ -141,17 +130,18 @@ class FaucetProxy:
     def _check_hash(self, status, config):
         """Return True if FAUCET's config hash == our config hash"""
         # Get FAUCET's config file name and hash value
-        file_hashes = status.faucet_config_hash_info
-        if len(file_hashes) != 1:
+        files = status.faucet_config_hash_info['config_files'].split(',')
+        hashes = status.faucet_config_hash_info['hashes'].split(',')
+        if len(files) != 1 or len(hashes) != 1:
             return False
-        name, hash_value = list(file_hashes.items())[0]
-        if abspath(name) != self.path:
+        config_file, hash_value = files[0], hashes[0]
+        if abspath(config_file) != self.path:
             return False
         # Get hash function
-        algs = list(status.faucet_config_hash_func.values())
-        if len(algs) != 1:
+        hash_funcs = list(status.faucet_config_hash_func.values())
+        if len(hash_funcs) != 1:
             return False
-        hash_func = getattr(hashlib, algs[0], None)
+        hash_func = getattr(hashlib, hash_funcs[0], None)
         if not hash_func:
             return False
         # Verify config file hash matches value from FAUCET

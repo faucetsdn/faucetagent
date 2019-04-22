@@ -29,7 +29,7 @@ echo "* Installing gnxi tools"
   done
 
 echo "* Installing python dependencies"
-  $PIP3 flake8 pylint protobuf grpcio grpcio-tools requests
+  $PIP3 flake8 pylint protobuf grpcio grpcio-tools requests prometheus-client
 
 echo "* Installing latest faucet"
   $PIP3 --upgrade git+https://github.com/faucetsdn/faucet
