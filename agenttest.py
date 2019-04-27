@@ -35,6 +35,7 @@ or losing connectivity between the agent and FAUCET.
 
 from shutil import which
 from subprocess import run, Popen, PIPE
+from signal import SIGINT
 from time import sleep, time
 from unittest import TestCase, main
 
@@ -414,7 +415,7 @@ def end_to_end_test():
             fail_count += 1
 
     info('* Stopping agent\n')
-    agent.terminate()
+    agent.send_signal(SIGINT)
     agent.wait()
     agent_log.close()
 
