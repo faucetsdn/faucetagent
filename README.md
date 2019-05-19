@@ -28,7 +28,7 @@ FAUCET configuration file (e.g. `faucet.yaml`) via gNMI path `/`.
     gnmi_get $AUTH -xpath=/ | string_val
 
     # Send a configuration file to FAUCET
-    gnmi_set $AUTH -replace=/:$(<faucet.yaml)
+    gnmi_set $AUTH -replace=/:"$(<faucet.yaml)"
 
 ### Simple end-to-end test using [mininet][5]
 
