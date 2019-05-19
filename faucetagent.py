@@ -136,7 +136,8 @@ class FaucetProxy:
             return False
         config_file, hash_value = files[0], hashes[0]
         if abspath(config_file) != self.path:
-            return False
+            warning("FAUCET config file %s may not be %s", config_file,
+                    self.path)
         # Get hash function
         hash_funcs = list(status.faucet_config_hash_func.values())
         if len(hash_funcs) != 1:
