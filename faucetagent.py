@@ -14,6 +14,7 @@ from collections import namedtuple
 from concurrent import futures
 from logging import basicConfig as logConfig, getLogger, DEBUG, INFO
 from os.path import abspath
+from shutil import which
 from subprocess import run
 from time import sleep, time
 import hashlib
@@ -41,6 +42,15 @@ def timestamp():
     """Return a gNMI timestamp (int nanoseconds)"""
     seconds = time()
     return int(seconds * 1e9)
+
+
+def checkdeps():
+    """Check external dependencies"""
+    cmds = [('fuser', 'psmisc')]
+    for cmd, pkg in cmds:
+        if not which(cmd):
+            error('Missing "%s" command from %s; exiting', cmd, pkg)
+            exit(1)
 
 
 # Logging
@@ -336,6 +346,7 @@ def parse():
 def main():
     """Parse arguments and run FAUCET gNMI agent"""
     args = parse()
+    checkdeps()
     # FaucetProxy talks to FAUCET and manages configfile
     proxy = FaucetProxy(
         path=args.configfile,
