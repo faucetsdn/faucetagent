@@ -66,11 +66,14 @@ class FaucetProxy:
     """Abstraction for communicating with FAUCET"""
 
     def __init__(self,
-                 path='faucet.yaml',
+                 path='/etc/faucet.yaml',
                  prometheus_port=9302,
                  timeout=120,
                  dp_wait_fraction=0.0):
-        """Initialize with path and local FAUCET prometheus port"""
+        """path: path to FAUCET's config file ('/etc/faucet.yaml')
+           prometheus_port: FAUCET's local prometheus port (9302)
+           timeout: config reload timeout in seconds (120)
+           dp_wait_fraction: fraction of DP updates to wait for (0.0)"""
         self.path = abspath(path)
         self.prometheus_port = prometheus_port
         self.prometheus_url = 'http://localhost:%d' % self.prometheus_port
@@ -219,7 +222,7 @@ class FaucetAgent(gNMIServicer):
     """Faucet gNMI agent"""
 
     def __init__(self, faucetProxy):
-        """faucetConfig: FaucetConfig() object"""
+        """faucetProxy: FaucetProxy() object"""
         gNMIServicer.__init__(self)
         self.faucet = faucetProxy
 
