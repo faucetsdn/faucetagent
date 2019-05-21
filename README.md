@@ -3,6 +3,7 @@
 [![Build Status][1]][2]
 
 This agent exposes a simple gNMI service to configure [FAUCET][3].
+Requires FAUCET version 1.9.3 or later.
 
 For now, it simply allows you to get or replace the entire
 FAUCET configuration file (e.g. `faucet.yaml`) via gNMI path `/`.
