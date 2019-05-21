@@ -14,6 +14,7 @@ from collections import namedtuple
 from concurrent import futures
 from logging import basicConfig as logConfig, getLogger, DEBUG, INFO
 from os.path import abspath
+from shutil import which
 from subprocess import run
 from time import sleep, time
 import hashlib
@@ -43,6 +44,15 @@ def timestamp():
     return int(seconds * 1e9)
 
 
+def checkdeps():
+    """Check external dependencies"""
+    cmds = [('fuser', 'psmisc')]
+    for cmd, pkg in cmds:
+        if not which(cmd):
+            error('Missing "%s" command from %s; exiting', cmd, pkg)
+            exit(1)
+
+
 # Logging
 
 LOG = getLogger('faucetagent')
@@ -56,11 +66,14 @@ class FaucetProxy:
     """Abstraction for communicating with FAUCET"""
 
     def __init__(self,
-                 path='faucet.yaml',
+                 path='/etc/faucet.yaml',
                  prometheus_port=9302,
                  timeout=120,
                  dp_wait_fraction=0.0):
-        """Initialize with path and local FAUCET prometheus port"""
+        """path: path to FAUCET's config file ('/etc/faucet.yaml')
+           prometheus_port: FAUCET's local prometheus port (9302)
+           timeout: config reload timeout in seconds (120)
+           dp_wait_fraction: fraction of DP updates to wait for (0.0)"""
         self.path = abspath(path)
         self.prometheus_port = prometheus_port
         self.prometheus_url = 'http://localhost:%d' % self.prometheus_port
@@ -209,7 +222,7 @@ class FaucetAgent(gNMIServicer):
     """Faucet gNMI agent"""
 
     def __init__(self, faucetProxy):
-        """faucetConfig: FaucetConfig() object"""
+        """faucetProxy: FaucetProxy() object"""
         gNMIServicer.__init__(self)
         self.faucet = faucetProxy
 
@@ -333,6 +346,7 @@ def parse():
 def main():
     """Parse arguments and run FAUCET gNMI agent"""
     args = parse()
+    checkdeps()
     # FaucetProxy talks to FAUCET and manages configfile
     proxy = FaucetProxy(
         path=args.configfile,
