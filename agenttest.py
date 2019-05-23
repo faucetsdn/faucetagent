@@ -33,6 +33,7 @@ or losing connectivity between the agent and FAUCET.
 
 """
 
+from functools import partial
 from shutil import which
 from subprocess import run, Popen, PIPE
 from signal import SIGINT
@@ -178,10 +179,15 @@ class FAUCET(Controller):
     cfile = 'faucet.yaml'
     timeout = 20
 
+    def __init__(self, name, config_stat_reload=0, **params):
+        self.config_stat_reload = config_stat_reload
+        Controller.__init__(self, name, **params)
+
     def start(self):
         """Start FAUCET"""
         env = ('FAUCET_CONFIG=' + self.cfile, 'FAUCET_LOG=STDOUT',
-               'FAUCET_EXCEPTION_LOG=STDERR')
+               'FAUCET_EXCEPTION_LOG=STDERR',
+               'FAUCET_CONFIG_STAT_RELOAD={0}'.format(self.config_stat_reload))
         self.cmd('export', *env)
         self.cmd('faucet 1>faucet.log 2>&1 &')
         if not wait_server(port=9302, timeout=self.timeout):
@@ -248,12 +254,6 @@ def make_certs():
 
 
 # Utility routines
-
-
-def write_file(filename, data):
-    """(Over)write a file with data"""
-    with open(filename, 'w') as ref:
-        ref.write(data)
 
 
 def wait_server(port, timeout=20):
@@ -332,11 +332,8 @@ def send_arps(hosts):
 # pylint: disable=too-many-locals, too-many-statements
 
 
-def end_to_end_test():
+def end_to_end_test(options, envs):
     """Simple end-to-end test of FAUCET config agent"""
-
-    # Start with empty FAUCET config file
-    write_file(FAUCET.cfile, '')
 
     info('\n* Generating certificates\n')
     make_certs()
@@ -344,9 +341,11 @@ def end_to_end_test():
     client_auth = (' -ca {cert_dir}/fakeca.crt -cert {cert_dir}/fakeclient.crt'
                    ' -key {cert_dir}/fakeclient.key'
                    ' -target_name localhost').format(**params).split()
+    params.update(options)
 
     info('* Starting network\n')
-    net = Mininet(topo=TestTopo(), controller=FAUCET, autoSetMacs=True)
+    faucet = partial(FAUCET, config_stat_reload=envs['config_stat_reload'])
+    net = Mininet(topo=TestTopo(), controller=faucet, autoSetMacs=True)
     net.start()
 
     info('* Shutting down any agents listening on %d\n' % GNMI_PORT)
@@ -358,6 +357,7 @@ def end_to_end_test():
                  ' --key {cert_dir}/fakeserver.key'
                  ' --gnmiport {gnmi_port}'
                  ' --configfile {cfile}'
+                 ' --nohup {nohup}'
                  ' --dpwait 1.0').format(**params).split()
     agent = Popen(agent_cmd, stdout=agent_log, stderr=agent_log)
 
@@ -438,8 +438,17 @@ class EndToEndTest(TestCase):
 
     def test_end_to_end(self):
         """Run end to end ping test"""
-        failures = end_to_end_test()
+        options = dict(nohup=0)
+        envs = dict(config_stat_reload=0)
+        failures = end_to_end_test(options, envs)
         self.assertEqual(failures, 0, "End-to-end test failed")
+
+    def test_end_to_end_nohup(self):
+        """Run end to end with nohup"""
+        options = dict(nohup=1)
+        envs = dict(config_stat_reload=1)
+        failures = end_to_end_test(options, envs)
+        self.assertEqual(failures, 0, "End-to-end nohup test failed")
 
 
 if __name__ == '__main__':

@@ -65,11 +65,12 @@ debug, info, warning, error = LOG.debug, LOG.info, LOG.warning, LOG.error
 class FaucetProxy:
     """Abstraction for communicating with FAUCET"""
 
-    def __init__(self,
+    def __init__(self,  # pylint: disable=too-many-arguments
                  path='/etc/faucet.yaml',
                  prometheus_port=9302,
                  timeout=120,
-                 dp_wait_fraction=0.0):
+                 dp_wait_fraction=0.0,
+                 nohup=0):
         """path: path to FAUCET's config file ('/etc/faucet.yaml')
            prometheus_port: FAUCET's local prometheus port (9302)
            timeout: config reload timeout in seconds (120)
@@ -79,6 +80,7 @@ class FaucetProxy:
         self.prometheus_url = 'http://localhost:%d' % self.prometheus_port
         self.timeout = timeout
         self.dp_wait_fraction = dp_wait_fraction
+        self.nohup = nohup
 
     def read_config(self):
         """Return FAUCET config file contents and timestamp"""
@@ -182,10 +184,11 @@ class FaucetProxy:
         """Signal FAUCET and wait for it to load our config"""
         debug('Reloading FAUCET config')
 
-        # Send HUP to tell FAUCET to reload the config file
-        debug('Sending HUP (config reload signal) to FAUCET')
-        cmd = 'fuser -k -HUP %d/tcp' % self.prometheus_port
-        run(cmd.split(), check=True)
+        if not self.nohup:
+            # Send HUP to tell FAUCET to reload the config file
+            debug('Sending HUP (config reload signal) to FAUCET')
+            cmd = 'fuser -k -HUP %d/tcp' % self.prometheus_port
+            run(cmd.split(), check=True)
 
         # Wait for FAUCET to reload config
         debug('Waiting for FAUCET config (re)load')
@@ -339,6 +342,10 @@ def parse():
         default=0.0,
         help='Wait for FAUCET to attempt to update this fraction of DPs')
     arg('--timeout', default=120, help='max time(s) to wait for config reload')
+    arg('--nohup',
+        type=int,
+        default='0',
+        help='Do not use HUP to reload FAUCET config file on Set operation')
     arg('-v', '--version', action='version', version=VERSION)
     return parser.parse_args()
 
@@ -351,7 +358,8 @@ def main():
     proxy = FaucetProxy(
         path=args.configfile,
         dp_wait_fraction=args.dpwait,
-        timeout=args.timeout)
+        timeout=args.timeout,
+        nohup=args.nohup)
     # FaucetAgent handles gNMI requests
     agent = FaucetAgent(proxy)
     # Start the FAUCET gNMI service
