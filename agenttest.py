@@ -212,6 +212,7 @@ class FAUCET(Controller):
 # Then we generate a self-signed client certificate and use
 # it to connect.
 
+GNMI_ADDR = '127.0.0.1'  # Agent listening address (default: [::])
 GNMI_PORT = 10161  # Agent listening port (default: gNMI port 10161)
 CERT_DIR = 'testcerts'  # We create and destroy this dir to store test certs
 TARGET = 'localhost'  # hostname use in certs and passed to -target
@@ -339,8 +340,9 @@ def end_to_end_test(options, envs):
 
     info('\n* Generating certificates\n')
     make_certs()
-    params = dict(cert_dir=CERT_DIR, gnmi_port=GNMI_PORT, cfile=FAUCET.cfile,
-                  prom_addr=PROM_ADDR, prom_port=PROM_PORT, target=TARGET)
+    params = dict(cert_dir=CERT_DIR, gnmi_addr=GNMI_ADDR, gnmi_port=GNMI_PORT,
+                  cfile=FAUCET.cfile, prom_addr=PROM_ADDR, prom_port=PROM_PORT,
+                  target=TARGET)
     client_auth = (' -ca {cert_dir}/fakeca.crt -cert {cert_dir}/fakeclient.crt'
                    ' -key {cert_dir}/fakeclient.key'
                    ' -target_name {target}').format(**params).split()
@@ -358,6 +360,7 @@ def end_to_end_test(options, envs):
     agent_log = open('faucetagent.log', 'w')
     agent_cmd = ('./faucetagent.py  --cert {cert_dir}/fakeserver.crt'
                  ' --key {cert_dir}/fakeserver.key'
+                 ' --gnmiaddr {gnmi_addr}'
                  ' --gnmiport {gnmi_port}'
                  ' --configfile {cfile}'
                  ' --nohup {nohup}'
