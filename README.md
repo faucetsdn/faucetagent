@@ -38,8 +38,8 @@ FAUCET configuration file (e.g. `faucet.yaml`) via gNMI path `/`.
     make
     sudo make test
 
-[1]: https://travis-ci.org/lantz/faucetagent.svg?branch=master
-[2]: https://travis-ci.org/lantz/faucetagent
+[1]: https://travis-ci.com/faucetsdn/faucetagent.svg?branch=master
+[2]: https://travis-ci.com/faucetsdn/faucetagent
 [3]: https://github.com/faucetsdn/faucet
 [4]: https://github.com/google/gnxi
 [5]: https://github.com/mininet/mininet
