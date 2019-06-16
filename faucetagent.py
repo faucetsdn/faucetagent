@@ -67,17 +67,20 @@ class FaucetProxy:
 
     def __init__(self,  # pylint: disable=too-many-arguments
                  path='/etc/faucet.yaml',
+                 prometheus_addr='http://localhost',
                  prometheus_port=9302,
                  timeout=120,
                  dp_wait_fraction=0.0,
                  nohup=0):
         """path: path to FAUCET's config file ('/etc/faucet.yaml')
+           prometheus_addr: FAUCET's prometheus address (http://localhost)
            prometheus_port: FAUCET's local prometheus port (9302)
            timeout: config reload timeout in seconds (120)
            dp_wait_fraction: fraction of DP updates to wait for (0.0)"""
         self.path = abspath(path)
         self.prometheus_port = prometheus_port
-        self.prometheus_url = 'http://localhost:%d' % self.prometheus_port
+        self.prometheus_url = '{0}:{1}'.format(prometheus_addr,
+                                               prometheus_port)
         self.timeout = timeout
         self.dp_wait_fraction = dp_wait_fraction
         self.nohup = nohup
@@ -332,6 +335,9 @@ def parse():
     arg('--key', required=True, help='private key file')
     arg('--gnmiport', type=int, default=10161, help='gNMI port (10161)')
     arg('--configfile', required=True, help='FAUCET config file')
+    arg('--promaddr',
+        default='http://localhost',
+        help='FAUCET prometheus address (http://localhost)')
     arg('--promport',
         type=int,
         default=9302,
@@ -357,6 +363,8 @@ def main():
     # FaucetProxy talks to FAUCET and manages configfile
     proxy = FaucetProxy(
         path=args.configfile,
+        prometheus_addr=args.promaddr,
+        prometheus_port=args.promport,
         dp_wait_fraction=args.dpwait,
         timeout=args.timeout,
         nohup=args.nohup)
