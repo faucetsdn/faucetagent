@@ -65,18 +65,20 @@ debug, info, warning, error = LOG.debug, LOG.info, LOG.warning, LOG.error
 class FaucetProxy:
     """Abstraction for communicating with FAUCET"""
 
-    def __init__(self,  # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments
+    def __init__(self,
                  path='/etc/faucet.yaml',
                  prometheus_addr='http://localhost',
                  prometheus_port=9302,
                  timeout=120,
                  dp_wait_fraction=0.0,
-                 nohup=0):
+                 nohup=False):
         """path: path to FAUCET's config file ('/etc/faucet.yaml')
            prometheus_addr: FAUCET's prometheus address (http://localhost)
            prometheus_port: FAUCET's local prometheus port (9302)
            timeout: config reload timeout in seconds (120)
-           dp_wait_fraction: fraction of DP updates to wait for (0.0)"""
+           dp_wait_fraction: fraction of DP updates to wait for (0.0)
+           nohup: don't send HUP to reload FAUCET config? (False)"""
         self.path = abspath(path)
         self.prometheus_port = prometheus_port
         self.prometheus_url = '{0}:{1}'.format(prometheus_addr,
@@ -350,8 +352,7 @@ def parse():
         help='Wait for FAUCET to attempt to update this fraction of DPs')
     arg('--timeout', default=120, help='max time(s) to wait for config reload')
     arg('--nohup',
-        type=int,
-        default='0',
+        action='store_true',
         help='Do not use HUP to reload FAUCET config file on Set operation')
     arg('-v', '--version', action='version', version=VERSION)
     return parser.parse_args()
@@ -361,6 +362,7 @@ def main():
     """Parse arguments and run FAUCET gNMI agent"""
     args = parse()
     checkdeps()
+
     # FaucetProxy talks to FAUCET and manages configfile
     proxy = FaucetProxy(
         path=args.configfile,
@@ -369,8 +371,10 @@ def main():
         dp_wait_fraction=args.dpwait,
         timeout=args.timeout,
         nohup=args.nohup)
+
     # FaucetAgent handles gNMI requests
     agent = FaucetAgent(proxy)
+
     # Start the FAUCET gNMI service
     gnmi_url = '{0}:{1}'.format(args.gnmiaddr, args.gnmiport)
     info('Starting FAUCET gNMI configuration agent on %s', gnmi_url)
@@ -379,6 +383,7 @@ def main():
         key_file=args.key,
         gnmi_url=gnmi_url,
         servicer=agent)
+
     info('FAUCET gNMI configuration agent exiting')
     exit(0)
 
