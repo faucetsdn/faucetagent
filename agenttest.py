@@ -216,6 +216,8 @@ GNMI_PORT = 10161  # Agent listening port (default: gNMI port 10161)
 CERT_DIR = 'testcerts'  # We create and destroy this dir to store test certs
 TARGET = 'localhost'  # hostname use in certs and passed to -target
 SUBJ = '/CN=' + TARGET  # Minimal specification for a cert
+PROM_ADDR = 'http://localhost'  # Prometheus listening address
+PROM_PORT = 9302  # Prometheus listening port (default: 9302)
 
 
 def make_certs():
@@ -337,10 +339,11 @@ def end_to_end_test(options, envs):
 
     info('\n* Generating certificates\n')
     make_certs()
-    params = dict(cert_dir=CERT_DIR, gnmi_port=GNMI_PORT, cfile=FAUCET.cfile)
+    params = dict(cert_dir=CERT_DIR, gnmi_port=GNMI_PORT, cfile=FAUCET.cfile,
+                  prom_addr=PROM_ADDR, prom_port=PROM_PORT, target=TARGET)
     client_auth = (' -ca {cert_dir}/fakeca.crt -cert {cert_dir}/fakeclient.crt'
                    ' -key {cert_dir}/fakeclient.key'
-                   ' -target_name localhost').format(**params).split()
+                   ' -target_name {target}').format(**params).split()
     params.update(options)
 
     info('* Starting network\n')
@@ -358,6 +361,8 @@ def end_to_end_test(options, envs):
                  ' --gnmiport {gnmi_port}'
                  ' --configfile {cfile}'
                  ' --nohup {nohup}'
+                 ' --promaddr {prom_addr}'
+                 ' --promport {prom_port}'
                  ' --dpwait 1.0').format(**params).split()
     agent = Popen(agent_cmd, stdout=agent_log, stderr=agent_log)
 
