@@ -309,7 +309,7 @@ class FaucetAgent(gNMIServicer):
 # Do it!
 
 
-def serve(cert_file, key_file, gnmi_port, servicer, max_workers=10):
+def serve(cert_file, key_file, gnmi_url, servicer, max_workers=10):
     """Create and run a gNMI service"""
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))
     add_gNMIServicer_to_server(servicer, server)
@@ -318,7 +318,7 @@ def serve(cert_file, key_file, gnmi_port, servicer, max_workers=10):
     with open(key_file) as keys:
         key = keys.read().encode('utf8')
     credentials = ssl_server_credentials([(key, cert)])
-    server.add_secure_port('[::]:%d' % gnmi_port, credentials)
+    server.add_secure_port(gnmi_url, credentials)
     server.start()
     try:
         while True:
@@ -333,6 +333,7 @@ def parse():
     arg = parser.add_argument
     arg('--cert', required=True, help='certificate file')
     arg('--key', required=True, help='private key file')
+    arg('--gnmiaddr', default='[::]', help='gNMI address to listen on ([::])')
     arg('--gnmiport', type=int, default=10161, help='gNMI port (10161)')
     arg('--configfile', required=True, help='FAUCET config file')
     arg('--promaddr',
@@ -341,7 +342,7 @@ def parse():
     arg('--promport',
         type=int,
         default=9302,
-        help='FAUCET prometheus port(9302)')
+        help='FAUCET prometheus port (9302)')
     arg('--dpwait',
         metavar='fraction',
         type=float,
@@ -371,11 +372,12 @@ def main():
     # FaucetAgent handles gNMI requests
     agent = FaucetAgent(proxy)
     # Start the FAUCET gNMI service
-    info('Starting FAUCET gNMI configuration agent on port %d', args.gnmiport)
+    gnmi_url = '{0}:{1}'.format(args.gnmiaddr, args.gnmiport)
+    info('Starting FAUCET gNMI configuration agent on %s', gnmi_url)
     serve(
         cert_file=args.cert,
         key_file=args.key,
-        gnmi_port=args.gnmiport,
+        gnmi_url=gnmi_url,
         servicer=agent)
     info('FAUCET gNMI configuration agent exiting')
     exit(0)
