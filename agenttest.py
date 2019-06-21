@@ -181,13 +181,13 @@ class FAUCET(Controller):
 
     def __init__(self, name, config_stat_reload=0, **params):
         self.config_stat_reload = config_stat_reload
-        Controller.__init__(self, name, **params)
+        super().__init__(name, **params)
 
     def start(self):
         """Start FAUCET"""
         env = ('FAUCET_CONFIG=' + self.cfile, 'FAUCET_LOG=STDOUT',
                'FAUCET_EXCEPTION_LOG=STDERR',
-               'FAUCET_CONFIG_STAT_RELOAD={0}'.format(self.config_stat_reload))
+               'FAUCET_CONFIG_STAT_RELOAD=%d' % self.config_stat_reload)
         self.cmd('export', *env)
         self.cmd('faucet 1>faucet.log 2>&1 &')
         if not wait_server(port=9302, timeout=self.timeout):
@@ -221,13 +221,13 @@ PROM_ADDR = 'http://localhost'  # Prometheus listening address
 PROM_PORT = 9302  # Prometheus listening port (default: 9302)
 
 
-def make_certs():
+def make_certs(cert_dir=CERT_DIR, subj=SUBJ):
     """Create fake certificates for agent and client"""
 
     def do(*cmds):  # pylint: disable=invalid-name
         """Run a bunch of commands via subprocess.run()"""
         for cmd in cmds:
-            run(cmd.format(cert_dir=CERT_DIR, subj=SUBJ).split(),
+            run(cmd.format(cert_dir=cert_dir, subj=subj).split(),
                 stdout=PIPE,
                 stderr=PIPE,
                 check=True)
@@ -332,45 +332,58 @@ def send_arps(hosts):
 # End-to-end agent test
 #
 
-# pylint: disable=too-many-locals, too-many-statements
+# pylint: disable=too-many-locals, too-many-statements, too-many-arguments
+# pylint: disable=unused-argument
 
 
-def end_to_end_test(options, envs):
-    """Simple end-to-end test of FAUCET config agent"""
+def end_to_end_test(cert_dir=CERT_DIR,
+                    gnmi_addr=GNMI_ADDR,
+                    gnmi_port=GNMI_PORT,
+                    target=TARGET,
+                    cfile=FAUCET.cfile,
+                    nohup=False,
+                    config_stat_reload=0,
+                    prom_addr='http://localhost',
+                    prom_port=9302):
+    """Simple end-to-end test of FAUCET config agent
+       cert_dir: directory to store fake certs
+       gnmi_addr: gNMI address that agent will listen on
+       gnmi_port: gNMI port that agent will listen on
+       nohup: send HUP to FAUCET to reload config? (False)
+       config_stat_reload: tell FAUCET to automatically reload (0)
+       prom_addr: FAUCET prometheus address (http://localhost)
+       prom_port: FAUCET prometheus port (9302)"""
 
     info('\n* Generating certificates\n')
-    make_certs()
-    params = dict(cert_dir=CERT_DIR, gnmi_addr=GNMI_ADDR, gnmi_port=GNMI_PORT,
-                  cfile=FAUCET.cfile, prom_addr=PROM_ADDR, prom_port=PROM_PORT,
-                  target=TARGET)
+    make_certs(cert_dir=cert_dir)
     client_auth = (' -ca {cert_dir}/fakeca.crt -cert {cert_dir}/fakeclient.crt'
                    ' -key {cert_dir}/fakeclient.key'
-                   ' -target_name {target}').format(**params).split()
-    params.update(options)
+                   ' -target_name {target}').format(**locals()).split()
 
     info('* Starting network\n')
-    faucet = partial(FAUCET, config_stat_reload=envs['config_stat_reload'])
+    faucet = partial(FAUCET, config_stat_reload=config_stat_reload)
     net = Mininet(topo=TestTopo(), controller=faucet, autoSetMacs=True)
     net.start()
 
     info('* Shutting down any agents listening on %d\n' % GNMI_PORT)
-    kill_server(port=GNMI_PORT)
+    kill_server(port=gnmi_port)
 
     info('* Starting agent\n')
     agent_log = open('faucetagent.log', 'w')
+    nohup = '--nohup' if nohup else ''
     agent_cmd = ('./faucetagent.py  --cert {cert_dir}/fakeserver.crt'
                  ' --key {cert_dir}/fakeserver.key'
                  ' --gnmiaddr {gnmi_addr}'
                  ' --gnmiport {gnmi_port}'
                  ' --configfile {cfile}'
-                 ' --nohup {nohup}'
                  ' --promaddr {prom_addr}'
                  ' --promport {prom_port}'
-                 ' --dpwait 1.0').format(**params).split()
+                 ' --dpwait 1.0'
+                 ' {nohup}').format(**locals()).split()
     agent = Popen(agent_cmd, stdout=agent_log, stderr=agent_log)
 
     info('* Waiting for agent to start up\n')
-    wait_server(port=GNMI_PORT)
+    wait_server(port=gnmi_port)
 
     info('* Checking gNMI capabilities\n')
     result = run(['gnmi_capabilities'] + client_auth, stdout=PIPE, check=True)
@@ -442,20 +455,16 @@ class EndToEndTest(TestCase):
     def setUpClass(cls):
         """Make sure that necessary executables are present"""
         for dep in cls.deps:
-            assert which(dep), ("cannot find '%s' in $PATH" % dep)
+            assert which(dep), "cannot find '%s' in $PATH" % dep
 
     def test_end_to_end(self):
         """Run end to end ping test"""
-        options = dict(nohup=0)
-        envs = dict(config_stat_reload=0)
-        failures = end_to_end_test(options, envs)
+        failures = end_to_end_test(nohup=False, config_stat_reload=0)
         self.assertEqual(failures, 0, "End-to-end test failed")
 
     def test_end_to_end_nohup(self):
         """Run end to end with nohup"""
-        options = dict(nohup=1)
-        envs = dict(config_stat_reload=1)
-        failures = end_to_end_test(options, envs)
+        failures = end_to_end_test(nohup=True, config_stat_reload=1)
         self.assertEqual(failures, 0, "End-to-end nohup test failed")
 
 
