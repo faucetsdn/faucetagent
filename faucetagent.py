@@ -1,15 +1,60 @@
 #!/usr/bin/env python3
+r"""
+
+FAUCET configuration agent
+
+Provides a simple gNMI/gRPC interface to support
+updating FAUCET's configuration file. This file
+must be accessible to both FAUCET and the agent.
+
+By default, a HUP signal is sent to FAUCET to
+trigger a config file reload.
+
+If FAUCET is run with FAUCET_CONFIG_STAT_RELOAD=1,
+then it should reload automatically, and the agent
+may be run with the --nohup option.
+
+This allows FAUCET and the agent to be run in separate
+containers/pid namespaces if desired, though they must
+share the directory where the config file is located.
+
+---
+EXAMPLES
+
+Starting the Agent:
+
+The agent must be invoked with a TLS certificate and private key,
+and the path to FAUCET's configuration file.
+
+./faucetagent.py --cert agent.crt --key agent.key \
+    --configfile /etc/faucet.yaml  >& faucetagent.log &
+
+Talking to the Agent with gNMI:
+
+It should be possible to talk to the agent using
+gNMI utilities such as gnmi_{capabilities,get,set}.
+
+# TLS authentication (client auth is ignored by agent atm)
+# this must be set appropriately for your environment
+AUTH="-ca ca.crt -cert client.crt -key client.key -target_name localhost"
+
+# Extract string_val from gnmi_get output
+string_val() { grep string_val: | awk -F 'string_val: "' '{printf $2;}'  |
+               sed -e 's/"$//' | xargs -0 printf; }
+
+# Fetch information about configuration schema
+gnmi_capabilities $AUTH
+
+# Fetch current configuration
+gnmi_get $AUTH -xpath=/ | string_val
+
+# Send a configuration file to FAUCET
+gnmi_set $AUTH -replace=/:"$(<faucet.yaml)"
+
 """
 
-faucetagent.py: FAUCET configuration agent
 
-We provide a simple gNMI/gRPC interface to support
-updating FAUCET's configuration file and restarting
-FAUCET.
-
-"""
-
-from argparse import ArgumentParser
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from collections import namedtuple
 from concurrent import futures
 from logging import basicConfig as logConfig, getLogger, DEBUG, INFO
@@ -26,6 +71,7 @@ from prometheus_client.parser import text_string_to_metric_families
 from gnmi_pb2_grpc import gNMIServicer, add_gNMIServicer_to_server
 from gnmi_pb2 import (CapabilityResponse, GetResponse, SetResponse, ModelData,
                       UpdateResult, JSON)
+
 
 # Semantic version of this FAUCET configuration agent
 VERSION = "0.1"
@@ -331,13 +377,18 @@ def serve(cert_file, key_file, gnmi_url, servicer, max_workers=10):
 
 def parse():
     """Parse command line arguments"""
-    parser = ArgumentParser()
+    # Use docstring at the top of this file
+    desc, examples = globals()['__doc__'].split('---')
+    parser = ArgumentParser(
+        description=desc,
+        epilog=examples,
+        formatter_class=RawDescriptionHelpFormatter)
     arg = parser.add_argument
     arg('--cert', required=True, help='certificate file')
     arg('--key', required=True, help='private key file')
+    arg('--configfile', required=True, help='FAUCET config file')
     arg('--gnmiaddr', default='[::]', help='gNMI address to listen on ([::])')
     arg('--gnmiport', type=int, default=10161, help='gNMI port (10161)')
-    arg('--configfile', required=True, help='FAUCET config file')
     arg('--promaddr',
         default='http://localhost',
         help='FAUCET prometheus address (http://localhost)')
