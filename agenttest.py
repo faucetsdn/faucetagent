@@ -337,22 +337,23 @@ def send_arps(hosts):
 
 
 def end_to_end_test(cert_dir=CERT_DIR,
+                    target=TARGET,
                     gnmi_addr=GNMI_ADDR,
                     gnmi_port=GNMI_PORT,
-                    target=TARGET,
                     cfile=FAUCET.cfile,
-                    nohup=False,
-                    config_stat_reload=0,
                     prom_addr='http://localhost',
-                    prom_port=9302):
+                    prom_port=9302,
+                    nohup=False,
+                    config_stat_reload=0):
     """Simple end-to-end test of FAUCET config agent
        cert_dir: directory to store fake certs
+       target: hostname for certs and gnmi_* -target
        gnmi_addr: gNMI address that agent will listen on
        gnmi_port: gNMI port that agent will listen on
-       nohup: send HUP to FAUCET to reload config? (False)
-       config_stat_reload: tell FAUCET to automatically reload (0)
        prom_addr: FAUCET prometheus address (http://localhost)
-       prom_port: FAUCET prometheus port (9302)"""
+       prom_port: FAUCET prometheus port (9302)
+       nohup: send HUP to FAUCET to reload config? (False)
+       config_stat_reload: tell FAUCET to automatically reload (0)"""
 
     info('\n* Generating certificates\n')
     make_certs(cert_dir=cert_dir)
@@ -409,7 +410,6 @@ def end_to_end_test(cert_dir=CERT_DIR,
         info('* Fetching configuration from agent\n')
         cmd = ['gnmi_get'] + client_auth + ['-xpath=/']
         result = run(cmd, stdout=PIPE, check=True)
-
         received = string_val(result.stdout.decode())
 
         info('* Verifying received configuration\n')
