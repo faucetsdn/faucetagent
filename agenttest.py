@@ -263,7 +263,7 @@ def wait_server(port, timeout=20):
     """Wait for server to listen on port"""
     cmd, start = ['fuser', '%d/tcp' % port], time()
     while True:
-        if run(cmd, stdout=PIPE).returncode == 0:
+        if run(cmd, stdout=PIPE, check=False).returncode == 0:
             return True
         if time() - start > timeout:
             break
@@ -275,7 +275,7 @@ def kill_server(port, timeout=20):
     """Shut down server listening on port"""
     cmd, start = ['fuser', '-k', '-9', '%d/tcp' % port], time()
     while True:
-        if run(cmd, stdout=PIPE).returncode != 0:
+        if run(cmd, stdout=PIPE, check=False).returncode != 0:
             return True
         if time() - start > timeout:
             break
