@@ -63,6 +63,7 @@ from shutil import which
 from subprocess import run
 from time import sleep, time
 import hashlib
+import sys
 
 import requests
 import grpc
@@ -96,7 +97,7 @@ def checkdeps():
     for cmd, pkg in cmds:
         if not which(cmd):
             error('Missing "%s" command from %s; exiting', cmd, pkg)
-            exit(1)
+            sys.exit(1)
 
 
 # Logging
@@ -436,7 +437,7 @@ def main():
         servicer=agent)
 
     info('FAUCET gNMI configuration agent exiting')
-    exit(0)
+    sys.exit(0)
 
 
 if __name__ == '__main__':
