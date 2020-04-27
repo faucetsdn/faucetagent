@@ -28,6 +28,9 @@ echo "* Installing gnxi tools"
     go install $repo/$tool
   done
 
+echo "* Updating pip3"
+  $PIP3 pip
+
 echo "* Installing python dependencies"
   $PIP3 flake8 pylint protobuf grpcio grpcio-tools requests prometheus-client
 
