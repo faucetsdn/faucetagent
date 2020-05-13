@@ -1,0 +1,23 @@
+name: faucetagent tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Faucetagent tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking out faucetagent source
+        uses: actions/checkout@v2
+      - name: Installing dependencies
+        run: |
+          # Unfortunately this is really slow:
+          # sudo apt-get update && sudo apt-get -y upgrade
+          ./dependencies.sh
+          ./test-dependencies.sh
+      - name: Building and running tests
+        run: |
+          make
+          make codecheck
+          ./faucetagent.py --version
+          sudo make test

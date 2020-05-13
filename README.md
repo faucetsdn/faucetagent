@@ -1,6 +1,6 @@
 ### FAUCET gNMI Configuration Agent
 
-[![Build Status][1]][2]
+[![Build/Test Status][1]][2]
 
 This agent exposes a simple gNMI service to configure [FAUCET][3].
 Requires FAUCET version 1.9.3 or later.
@@ -38,8 +38,8 @@ FAUCET configuration file (e.g. `faucet.yaml`) via gNMI path `/`.
     make
     sudo make test
 
-[1]: https://travis-ci.com/faucetsdn/faucetagent.svg?branch=master
-[2]: https://travis-ci.com/faucetsdn/faucetagent
+[1]: https://github.com/faucetsdn/faucetagent/workflows/faucetagent%20tests/badge.svg
+[2]: https://github.com/faucetsdn/faucetagent/actions
 [3]: https://github.com/faucetsdn/faucet
 [4]: https://github.com/google/gnxi
 [5]: https://github.com/mininet/mininet
