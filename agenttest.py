@@ -181,7 +181,7 @@ class FAUCET(Controller):
 
     def __init__(self, name, config_stat_reload=0, **params):
         self.config_stat_reload = config_stat_reload
-        super().__init__(name, **params)
+        super().__init__(name, command='faucet', **params)
 
     def start(self):
         """Start FAUCET"""
@@ -189,17 +189,11 @@ class FAUCET(Controller):
                'FAUCET_EXCEPTION_LOG=STDERR',
                'FAUCET_CONFIG_STAT_RELOAD=%d' % self.config_stat_reload)
         self.cmd('export', *env)
-        self.cmd('faucet 1>faucet.log 2>&1 &')
+        self.cmd(self.command, '1>faucet.log 2>&1 &')
         if not wait_server(port=9302, timeout=self.timeout):
             error('Timeout waiting for FAUCET to start. Log:\n')
             with open('faucet.log') as log:
                 error(log.read())
-
-    def stop(self, *args, **kwargs):
-        """Stop FAUCET"""
-        del args, kwargs
-        self.cmd('kill %faucet')
-        self.cmd('wait')
 
 
 # Certificate management:
