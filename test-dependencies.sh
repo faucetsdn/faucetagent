@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-PIP3='sudo pip3 install -q -U --no-cache'
+PIP3='sudo pip3 install -q -U'
 APT='sudo apt -qq -y install'
 
 echo "* Installing apt dependencies"
@@ -31,10 +31,7 @@ echo "* Installing gnxi tools"
   done
 
 echo "* Installing python dependencies"
-  $PIP3 flake8 pylint protobuf grpcio grpcio-tools requests prometheus-client
-
-echo "* Installing latest faucet"
-  $PIP3 --upgrade git+https://github.com/faucetsdn/faucet
+  $PIP3 -r test-requirements.txt
 
 echo "* Installing latest mininet and dependencies"
   $APT openvswitch-switch net-tools telnet
