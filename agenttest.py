@@ -39,6 +39,8 @@ from subprocess import run, Popen, PIPE
 from signal import SIGINT
 from time import sleep, time
 from unittest import TestCase, main
+import os
+import tempfile
 
 from mininet.net import Mininet
 from mininet.node import Controller
@@ -176,11 +178,13 @@ def check(hosts, groups):
 class FAUCET(Controller):
     """Simple FAUCET controller class"""
 
-    cfile = 'faucet.yaml'
     timeout = 20
 
-    def __init__(self, name, config_stat_reload=0, **params):
+    def __init__(self, name, config_stat_reload=0, cdir='/tmp/', **params):
         self.config_stat_reload = config_stat_reload
+        self.cdir = cdir
+        self.cfile = os.path.join(self.cdir, 'faucet.yaml')
+        self.clog = os.path.join(self.cdir, 'faucet.log')
         super().__init__(name, command='faucet', **params)
 
     def start(self):
@@ -189,10 +193,10 @@ class FAUCET(Controller):
                'FAUCET_EXCEPTION_LOG=STDERR',
                'FAUCET_CONFIG_STAT_RELOAD=%d' % self.config_stat_reload)
         self.cmd('export', *env)
-        self.cmd(self.command, '1>faucet.log 2>&1 &')
+        self.cmd(self.command, '1>%s 2>&1 &' % self.clog)
         if not wait_server(port=9302, timeout=self.timeout):
             error('Timeout waiting for FAUCET to start. Log:\n')
-            with open('faucet.log') as log:
+            with open(self.clog) as log:
                 error(log.read())
 
 
@@ -225,8 +229,6 @@ def make_certs(cert_dir=CERT_DIR, subj=SUBJ):
                 stdout=PIPE,
                 stderr=PIPE,
                 check=True)
-
-    do('rm -rf {cert_dir}', 'mkdir {cert_dir}')
 
     info('* Generating fake CA cert\n')
 
@@ -331,16 +333,19 @@ def send_arps(hosts):
 
 
 def end_to_end_test(cert_dir=CERT_DIR,
+                    log_dir='/tmp',
+                    cdir='/tmp',
                     target=TARGET,
                     gnmi_addr=GNMI_ADDR,
                     gnmi_port=GNMI_PORT,
-                    cfile=FAUCET.cfile,
                     prom_addr='http://localhost',
                     prom_port=9302,
                     nohup=False,
                     config_stat_reload=0):
     """Simple end-to-end test of FAUCET config agent
        cert_dir: directory to store fake certs
+       log_dir: directory to store agent logs
+       cdir: directory for FAUCET's logs and config
        target: hostname for certs and gnmi_* -target
        gnmi_addr: gNMI address that agent will listen on
        gnmi_port: gNMI port that agent will listen on
@@ -356,15 +361,16 @@ def end_to_end_test(cert_dir=CERT_DIR,
                    ' -target_name {target}').format(**locals()).split()
 
     info('* Starting network\n')
-    faucet = partial(FAUCET, config_stat_reload=config_stat_reload)
+    faucet = partial(FAUCET, config_stat_reload=config_stat_reload, cdir=cdir)
     net = Mininet(topo=TestTopo(), controller=faucet, autoSetMacs=True)
     net.start()
 
     info('* Shutting down any agents listening on %d\n' % GNMI_PORT)
     kill_server(port=gnmi_port)
 
+    cfile = os.path.join(cdir, 'faucet.yaml')
+
     info('* Starting agent\n')
-    agent_log = open('faucetagent.log', 'w')
     nohup = '--nohup' if nohup else ''
     agent_cmd = ('./faucetagent.py  --cert {cert_dir}/fakeserver.crt'
                  ' --key {cert_dir}/fakeserver.key'
@@ -375,64 +381,68 @@ def end_to_end_test(cert_dir=CERT_DIR,
                  ' --promport {prom_port}'
                  ' --dpwait 1.0'
                  ' {nohup}').format(**locals()).split()
-    agent = Popen(agent_cmd, stdout=agent_log, stderr=agent_log)
+    with open(os.path.join(log_dir, 'faucetagent.log'), 'w') as agent_log:
+        agent = Popen(agent_cmd, stdout=agent_log, stderr=agent_log)
 
-    info('* Waiting for agent to start up\n')
-    wait_server(port=gnmi_port)
+        info('* Waiting for agent to start up\n')
+        wait_server(port=gnmi_port)
 
-    info('* Checking gNMI capabilities\n')
-    result = run(['gnmi_capabilities'] + client_auth, stdout=PIPE, check=True)
-    items = [
-        'capabilitiesResponse:', 'name: "FAUCET"', 'organization: "faucet.nz"'
-    ]
-    capabilities = result.stdout.decode()
-    for item in items:
-        assert item in capabilities, ("missing capability field <%s>" % item)
+        info('* Checking gNMI capabilities\n')
+        result = run(
+            ['gnmi_capabilities'] + client_auth, stdout=PIPE, check=True)
+        items = [
+            'capabilitiesResponse:',
+            'name: "FAUCET"',
+            'organization: "faucet.nz"'
+        ]
+        capabilities = result.stdout.decode()
+        for item in items:
+            assert item in capabilities, (
+                "missing capability field <%s>" % item)
 
-    fail_count = 0
+        fail_count = 0
 
-    for test_num, test_case in enumerate(TEST_CASES):
+        for test_num, test_case in enumerate(TEST_CASES):
 
-        # Get the test case configuration
-        config = CONFIG.format(**test_case)
+            # Get the test case configuration
+            config = CONFIG.format(**test_case)
 
-        info('* Sending test configuration to agent\n')
-        cmd = ['gnmi_set'] + client_auth + ['-replace=/:' + config]
-        result = run(cmd, stdout=PIPE, check=True)
-        sent = string_val(result.stdout.decode())
+            info('* Sending test configuration to agent\n')
+            cmd = ['gnmi_set'] + client_auth + ['-replace=/:' + config]
+            result = run(cmd, stdout=PIPE, check=True)
+            sent = string_val(result.stdout.decode())
 
-        info('* Fetching configuration from agent\n')
-        cmd = ['gnmi_get'] + client_auth + ['-xpath=/']
-        result = run(cmd, stdout=PIPE, check=True)
-        received = string_val(result.stdout.decode())
+            info('* Fetching configuration from agent\n')
+            cmd = ['gnmi_get'] + client_auth + ['-xpath=/']
+            result = run(cmd, stdout=PIPE, check=True)
+            received = string_val(result.stdout.decode())
 
-        info('* Verifying received configuration\n')
-        if sent != received:
-            error('ERROR: received config differs from sent config\n')
+            info('* Verifying received configuration\n')
+            if sent != received:
+                error('ERROR: received config differs from sent config\n')
 
-        # Assume state is good after all switches have some new flows
-        info('* Waiting for VLAN flows\n')
-        wait_for_flows(net.switches, ['dl_vlan=%d' % test_case['vid1']])
-        info('* Sending gratuitous ARPs\n')
-        send_arps(net.hosts)
-        info('* Waiting for MAC learning\n')
-        wait_for_flows(net.switches,
-                       ['dl_dst=%s' % host.MAC() for host in net.hosts])
+            # Assume state is good after all switches have some new flows
+            info('* Waiting for VLAN flows\n')
+            wait_for_flows(net.switches, ['dl_vlan=%d' % test_case['vid1']])
+            info('* Sending gratuitous ARPs\n')
+            send_arps(net.hosts)
+            info('* Waiting for MAC learning\n')
+            wait_for_flows(net.switches,
+                           ['dl_dst=%s' % host.MAC() for host in net.hosts])
 
-        groups = test_case['groups']
-        info('* Verifying connectivity for', groups, '\n')
-        host_groups = [net.get(*group) for group in groups]
-        errors = check(hosts=net.hosts, groups=host_groups)
-        info('Test Case #%d:' % test_num, 'OK'
-             if errors == 0 else 'FAIL (%d errors)' % errors, '\n')
+            groups = test_case['groups']
+            info('* Verifying connectivity for', groups, '\n')
+            host_groups = [net.get(*group) for group in groups]
+            errors = check(hosts=net.hosts, groups=host_groups)
+            info('Test Case #%d:' % test_num, 'OK'
+                 if errors == 0 else 'FAIL (%d errors)' % errors, '\n')
 
-        if errors:
-            fail_count += 1
+            if errors:
+                fail_count += 1
 
-    info('* Stopping agent\n')
-    agent.send_signal(SIGINT)
-    agent.wait()
-    agent_log.close()
+        info('* Stopping agent\n')
+        agent.send_signal(SIGINT)
+        agent.wait()
 
     info('* Stopping network\n')
     net.stop()
@@ -453,14 +463,15 @@ class EndToEndTest(TestCase):
 
     def test_end_to_end(self):
         """Run end to end ping test"""
-        failures = end_to_end_test(nohup=False, config_stat_reload=0)
-        self.assertEqual(failures, 0, "End-to-end test failed")
-
-    def test_end_to_end_nohup(self):
-        """Run end to end with nohup"""
-        failures = end_to_end_test(nohup=True, config_stat_reload=1)
-        self.assertEqual(failures, 0, "End-to-end nohup test failed")
-
+        for nohup, config_stat_reload in ((False, 0), (True, 1)):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                failures = end_to_end_test(
+                    nohup=nohup, config_stat_reload=config_stat_reload,
+                    cert_dir=tmpdir, log_dir=tmpdir, cdir=tmpdir)
+                self.assertEqual(
+                    failures, 0,
+                    "End-to-end test fail nohup: %s config_stat_reload: %u" % (
+                        nohup, config_stat_reload))
 
 if __name__ == '__main__':
     setLogLevel('info')
