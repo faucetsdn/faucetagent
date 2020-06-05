@@ -12,6 +12,8 @@ extstubs = gnmi_ext_pb2.py gnmi_ext_pb2_grpc.py
 # GRPC/protobuf compiler command
 protoc = python3 -m grpc_tools.protoc --python_out=. --grpc_python_out=. -I.
 
+srcs = faucetagent.py agenttest.py
+
 # Set a default GOPATH if needed for gnmi_* tools used in test
 GOPATH ?= $(HOME)/go
 
@@ -36,11 +38,12 @@ test: all
 	GOPATH=$(GOPATH) PATH=$(GOPATH)/bin:$(PATH) ./agenttest.py -v
 
 codecheck: all
-	flake8 faucetagent.py agenttest.py
-	pylint faucetagent.py agenttest.py
+	flake8 $(srcs)
+	pylint $(srcs)
+	pytype $(srcs)
 
 yapf:
-	yapf3 -i *.py
+	yapf3 -i $(srcs)
 
 clean:
 	rm -rf *.proto *_pb2*.py *.pyc *~ \#*\# testcerts *.log __pycache__ *.yaml
