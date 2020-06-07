@@ -3,4 +3,4 @@ pyflakes==2.2.0
 flake8==2.6.0
 pylint==2.5.2
 pytype==2020.6.1
-faucet==1.9.43
+git+https://github.com/faucetsdn/faucet
