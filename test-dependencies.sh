@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-PIP3='sudo pip3 install -q -U'
+PIP3='sudo pip3 install -q -U --no-cache'
 APT='sudo apt -qq -y install'
 
 echo "* Installing apt dependencies"
