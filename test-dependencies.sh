@@ -30,13 +30,9 @@ echo "* Installing gnxi tools"
     go install $repo/$tool
   done
 
-echo "* Installing python dependencies"
-  $PIP3 flake8 pylint protobuf grpcio grpcio-tools requests prometheus-client
+echo "* Installing python dependencies and FAUCET"
+  $PIP3 -r test-requirements.txt
 
-echo "* Installing latest faucet"
-  $PIP3 --upgrade git+https://github.com/faucetsdn/faucet
-
-echo "* Installing latest mininet and dependencies"
   $APT openvswitch-switch net-tools telnet
   sudo service openvswitch-switch start
   TMPDIR=$(mktemp -d) && pushd $TMPDIR
