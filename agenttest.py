@@ -368,7 +368,8 @@ def end_to_end_test(cert_dir=CERT_DIR,
     info('* Shutting down any agents listening on %d\n' % GNMI_PORT)
     kill_server(port=gnmi_port)
 
-    cfile = os.path.join(cdir, 'faucet.yaml')  # pylint: disable=possibly-unused-variable
+    cfile = os.path.join(
+        cdir, 'faucet.yaml')  # pylint: disable=possibly-unused-variable
 
     info('* Starting agent\n')
     nohup = '--nohup' if nohup else ''
