@@ -392,8 +392,7 @@ def end_to_end_test(cert_dir=CERT_DIR,
         result = run(
             ['gnmi_capabilities'] + client_auth, stdout=PIPE, check=True)
         items = [
-            'capabilitiesResponse:',
-            'name: "FAUCET"',
+            'capabilitiesResponse:', 'name: "FAUCET"',
             'organization: "faucet.nz"'
         ]
         capabilities = result.stdout.decode()
@@ -467,12 +466,16 @@ class EndToEndTest(TestCase):
         for nohup, config_stat_reload in ((False, 0), (True, 1)):
             with tempfile.TemporaryDirectory() as tmpdir:
                 failures = end_to_end_test(
-                    nohup=nohup, config_stat_reload=config_stat_reload,
-                    cert_dir=tmpdir, log_dir=tmpdir, cdir=tmpdir)
+                    nohup=nohup,
+                    config_stat_reload=config_stat_reload,
+                    cert_dir=tmpdir,
+                    log_dir=tmpdir,
+                    cdir=tmpdir)
                 self.assertEqual(
                     failures, 0,
-                    "End-to-end test fail nohup: %s config_stat_reload: %u" % (
-                        nohup, config_stat_reload))
+                    "End-to-end test fail nohup: %s config_stat_reload: %u" %
+                    (nohup, config_stat_reload))
+
 
 if __name__ == '__main__':
     setLogLevel('info')

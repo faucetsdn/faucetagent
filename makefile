@@ -38,6 +38,7 @@ test: all
 	GOPATH=$(GOPATH) PATH=$(GOPATH)/bin:$(PATH) ./agenttest.py -v
 
 codecheck: all
+	yapf3 -d $(srcs)
 	flake8 $(srcs)
 	pylint $(srcs)
 	pytype $(srcs)
