@@ -5,7 +5,7 @@ PIP3='sudo pip3 install -q -U --no-cache'
 APT='sudo apt -qq -y install'
 
 echo "* Installing apt dependencies"
-  $APT iputils-arping
+  $APT iputils-arping yapf3 python3-yapf
   # Workaround to avoid breaking go on github actions
   which go || $APT install golang
 
