@@ -53,7 +53,6 @@ gnmi_set $AUTH -replace=/:"$(<faucet.yaml)"
 
 """
 
-
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from collections import namedtuple
 from concurrent import futures
@@ -72,7 +71,6 @@ from prometheus_client.parser import text_string_to_metric_families
 from gnmi_pb2_grpc import gNMIServicer, add_gNMIServicer_to_server
 from gnmi_pb2 import (CapabilityResponse, GetResponse, SetResponse, ModelData,
                       UpdateResult, JSON)
-
 
 # Semantic version of this FAUCET configuration agent
 VERSION = "0.1"
