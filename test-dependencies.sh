@@ -26,7 +26,7 @@ echo "* Installing gnxi tools"
   export PATH=$GOPATH/bin:$PATH
   repo=github.com/google/gnxi
   for tool in gnmi_{capabilities,get,set,target}; do
-    go get $repo/$tool
+    go get -u $repo/$tool
     go install $repo/$tool
   done
 

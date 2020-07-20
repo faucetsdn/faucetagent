@@ -387,7 +387,7 @@ def parse():
     arg('--key', required=True, help='private key file')
     arg('--configfile', required=True, help='FAUCET config file')
     arg('--gnmiaddr', default='[::]', help='gNMI address to listen on ([::])')
-    arg('--gnmiport', type=int, default=10161, help='gNMI port (10161)')
+    arg('--gnmiport', type=int, default=9339, help='gNMI port (9339)')
     arg('--promaddr',
         default='http://localhost',
         help='FAUCET prometheus address (http://localhost)')

@@ -211,7 +211,7 @@ class FAUCET(Controller):
 # it to connect.
 
 GNMI_ADDR = '127.0.0.1'  # Agent listening address (default: [::])
-GNMI_PORT = 10161  # Agent listening port (default: gNMI port 10161)
+GNMI_PORT = 9339  # Agent listening port (default: gNMI port 9339)
 CERT_DIR = 'testcerts'  # We create and destroy this dir to store test certs
 TARGET = 'localhost'  # hostname use in certs and passed to -target
 SUBJ = '/CN=' + TARGET  # Minimal specification for a cert
