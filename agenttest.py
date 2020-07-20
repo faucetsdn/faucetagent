@@ -34,13 +34,13 @@ or losing connectivity between the agent and FAUCET.
 """
 
 from functools import partial
+from os.path import join
 from shutil import which
 from subprocess import run, Popen, PIPE
 from signal import SIGINT
+from tempfile import TemporaryDirectory
 from time import sleep, time
 from unittest import TestCase, main
-import os
-import tempfile
 
 from mininet.net import Mininet
 from mininet.node import Controller
@@ -183,8 +183,8 @@ class FAUCET(Controller):
     def __init__(self, name, config_stat_reload=0, cdir='/tmp/', **params):
         self.config_stat_reload = config_stat_reload
         self.cdir = cdir
-        self.cfile = os.path.join(self.cdir, 'faucet.yaml')
-        self.clog = os.path.join(self.cdir, 'faucet.log')
+        self.cfile = join(self.cdir, 'faucet.yaml')
+        self.clog = join(self.cdir, 'faucet.log')
         super().__init__(name, command='faucet', **params)
 
     def start(self):
@@ -368,7 +368,7 @@ def end_to_end_test(cert_dir=CERT_DIR,
     info('* Shutting down any agents listening on %d\n' % GNMI_PORT)
     kill_server(port=gnmi_port)
 
-    cfile = os.path.join(  # pylint: disable=possibly-unused-variable
+    cfile = join(  # pylint: disable=possibly-unused-variable
         cdir, 'faucet.yaml')
 
     info('* Starting agent\n')
@@ -382,7 +382,7 @@ def end_to_end_test(cert_dir=CERT_DIR,
                  ' --promport {prom_port}'
                  ' --dpwait 1.0'
                  ' {nohup}').format(**locals()).split()
-    with open(os.path.join(log_dir, 'faucetagent.log'), 'w') as agent_log:
+    with open(join(log_dir, 'faucetagent.log'), 'w') as agent_log:
         agent = Popen(agent_cmd, stdout=agent_log, stderr=agent_log)
 
         info('* Waiting for agent to start up\n')
@@ -464,7 +464,7 @@ class EndToEndTest(TestCase):
     def test_end_to_end(self):
         """Run end to end ping test"""
         for nohup, config_stat_reload in ((False, 0), (True, 1)):
-            with tempfile.TemporaryDirectory() as tmpdir:
+            with TemporaryDirectory() as tmpdir:
                 failures = end_to_end_test(
                     nohup=nohup,
                     config_stat_reload=config_stat_reload,
