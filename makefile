@@ -47,4 +47,5 @@ yapf:
 	yapf3 -i $(srcs)
 
 clean:
-	rm -rf *.proto *_pb2*.py *.pyc *~ \#*\# testcerts *.log __pycache__ *.yaml
+	rm -rf *.proto *_pb2*.py *.pyc *~ \#*\# testcerts *.log __pycache__ \
+	       *.yaml pytype_output
