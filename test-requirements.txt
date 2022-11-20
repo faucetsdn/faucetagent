@@ -2,5 +2,5 @@
 pyflakes==2.2.0
 flake8==3.8.3
 pylint==2.5.3
-pytype==2020.7.20
+pytype==2022.11.18
 git+https://github.com/faucetsdn/faucet
