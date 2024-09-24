@@ -1,6 +1,6 @@
 -r requirements.txt
 pyflakes==2.2.0
 flake8==3.8.3
-pylint==2.5.3
+pylint==3.3.1
 pytype==2020.7.20
 git+https://github.com/faucetsdn/faucet
